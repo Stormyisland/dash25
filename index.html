@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EDF Motor Battery Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;500&display=swap');
+        
+        :root {
+            --primary: #1a237e;
+            --secondary: #00acc1;
+            --danger: #d32f2f;
+            --warning: #ffa000;
+            --success: #388e3c;
+        }
+        
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #0a1929;
+            color: #e0e0e0;
+            overflow-x: hidden;
+        }
+        
+        .dashboard-title {
+            font-family: 'Orbitron', sans-serif;
+            text-shadow: 0 0 10px rgba(0, 172, 193, 0.7);
+        }
+        
+        .gauge-container {
+            perspective: 1000px;
+            transition: all 0.3s ease;
+        }
+        
+        .gauge-container:hover {
+            transform: translateY(-5px);
+        }
+        
+        .gauge {
+            position: relative;
+            height: 120px;
+            background: rgba(26, 35, 126, 0.2);
+            border-radius: 10px;
+            border: 1px solid var(--secondary);
+            box-shadow: 0 0 15px rgba(0, 172, 193, 0.3);
+            overflow: hidden;
+        }
+        
+        .gauge-fill {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 0%;
+            background: linear-gradient(to top, var(--secondary), #00e5ff);
+            transition: height 1s ease-out;
+        }
+        
+        .low-battery {
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 5px rgba(211, 47, 47, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(211, 47, 47, 0.8); }
+            100% { box-shadow: 0 0 5px rgba(211, 47, 47, 0.5); }
+        }
+        
+        .warning-battery {
+            animation: pulse-warning 2s infinite;
+        }
+        
+        @keyframes pulse-warning {
+            0% { box-shadow: 0 0 5px rgba(255, 160, 0, 0.5); }
+            50% { box-shadow: 0 0 15px rgba(255, 160, 0, 0.8); }
+            100% { box-shadow: 0 0 5px rgba(255, 160, 0, 0.5); }
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        
+        .connection-status {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            z-index: 100;
+        }
+        
+        .motor-control-btn {
+            transition: all 0.2s ease;
+        }
+        
+        .motor-control-btn:hover {
+            transform: scale(1.05);
+        }
+        
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-6">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <header class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="dashboard-title text-3xl font-bold text-cyan-400">
+                    <i class="fas fa-fan mr-2"></i> EDF Motor Battery Dashboard
+                </h1>
+                <p class="text-gray-400">Real-time monitoring of electric duct fan battery systems</p>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="text-right">
+                    <p class="text-sm text-gray-400">System Status</p>
+                    <p class="font-semibold text-green-400 flex items-center justify-end">
+                        <span class="status-indicator bg-green-500"></span>
+                        <span>Operational</span>
+                    </p>
+                </div>
+                <div class="h-10 w-10 rounded-full bg-blue-900 flex items-center justify-center">
+                    <i class="fas fa-cog text-blue-300"></i>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Dashboard Controls -->
+        <div class="bg-gray-800 bg-opacity-50 rounded-xl p-4 mb-8 flex flex-wrap justify-between items-center">
+            <div class="flex items-center space-x-4 mb-4 sm:mb-0">
+                <button class="motor-control-btn bg-blue-700 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center">
+                    <i class="fas fa-play mr-2"></i> Start All
+                </button>
+                <button class="motor-control-btn bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center">
+                    <i class="fas fa-stop mr-2"></i> Stop All
+                </button>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="flex items-center">
+                    <span class="status-indicator bg-green-500 mr-1"></span>
+                    <span class="text-xs text-gray-400 mr-3">Normal</span>
+                    <span class="status-indicator bg-yellow-500 mr-1"></span>
+                    <span class="text-xs text-gray-400 mr-3">Warning</span>
+                    <span class="status-indicator bg-red-500 mr-1"></span>
+                    <span class="text-xs text-gray-400">Critical</span>
+                </div>
+                <select class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg px-3 py-2">
+                    <option>View Mode: Detailed</option>
+                    <option>View Mode: Compact</option>
+                    <option>View Mode: Overview</option>
+                </select>
+            </div>
+        </div>
+        
+        <!-- Main Dashboard -->
+        <div class="dashboard-grid">
+            <!-- Motor 1 -->
+            <div class="gauge-container bg-gray-800 bg-opacity-30 rounded-xl p-4 border border-gray-700">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-semibold text-lg text-cyan-300">
+                        <i class="fas fa-fan mr-2"></i> EDF Motor 1
+                    </h3>
+                    <span class="status-indicator bg-green-500"></span>
+                </div>
+                <div class="gauge mb-3" id="motor1-gauge">
+                    <div class="gauge-fill" id="motor1-fill"></div>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-400">Battery Level</span>
+                    <span class="font-mono" id="motor1-percent">85%</span>
+                </div>
+                <div class="mt-3 pt-3 border-t border-gray-700 flex justify-between">
+                    <div class="text-xs text-gray-400">
+                        <div>Voltage: <span class="text-white" id="motor1-voltage">24.7V</span></div>
+                        <div>Temp: <span class="text-white" id="motor1-temp">42°C</span></div>
+                    </div>
+                    <button class="motor-control-btn bg-blue-700 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs">
+                        <i class="fas fa-sliders-h mr-1"></i> Adjust
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Motor 2 -->
+            <div class="gauge-container bg-gray-800 bg-opacity-30 rounded-xl p-4 border border-gray-700">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-semibold text-lg text-cyan-300">
+                        <i class="fas fa-fan mr-2"></i> EDF Motor 2
+                    </h3>
+                    <span class="status-indicator bg-green-500"></span>
+                </div>
+                <div class="gauge mb-3" id="motor2-gauge">
+                    <div class="gauge-fill" id="motor2-fill"></div>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-400">Battery Level</span>
+                    <span class="font-mono" id="motor2-percent">78%</span>
+                </div>
+                <div class="mt-3 pt-3 border-t border-gray-700 flex justify-between">
+                    <div class="text-xs text-gray-400">
+                        <div>Voltage: <span class="text-white" id="motor2-voltage">24.3V</span></div>
+                        <div>Temp: <span class="text-white" id="motor2-temp">45°C</span></div>
+                    </div>
+                    <button class="motor-control-btn bg-blue-700 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs">
+                        <i class="fas fa-sliders-h mr-1"></i> Adjust
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Motor 3 -->
+            <div class="gauge-container bg-gray-800 bg-opacity-30 rounded-xl p-4 border border-gray-700">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-semibold text-lg text-cyan-300">
+                        <i class="fas fa-fan mr-2"></i> EDF Motor 3
+                    </h3>
+                    <span class="status-indicator bg-yellow-500"></span>
+                </div>
+                <div class="gauge mb-3 warning-battery" id="motor3-gauge">
+                    <div class="gauge-fill" style="background: linear-gradient(to top, #ffa000, #ffca28);" id="motor3-fill"></div>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-400">Battery Level</span>
+                    <span class="font-mono" id="motor3-percent">32%</span>
+                </div>
+                <div class="mt-3 pt-3 border-t border-gray-700 flex justify-between">
+                    <div class="text-xs text-gray-400">
+                        <div>Voltage: <span class="text-white" id="motor3-voltage">23.1V</span></div>
+                        <div>Temp: <span class="text-white" id="motor3-temp">51°C</span></div>
+                    </div>
+                    <button class="motor-control-btn bg-blue-700 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs">
+                        <i class="fas fa-sliders-h mr-1"></i> Adjust
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Motor 4 -->
+            <div class="gauge-container bg-gray-800 bg-opacity-30 rounded-xl p-4 border border-gray-700">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-semibold text-lg text-cyan-300">
+                        <i class="fas fa-fan mr-2"></i> EDF Motor 4
+                    </h3>
+                    <span class="status-indicator bg-green-500"></span>
+                </div>
+                <div class="gauge mb-3" id="motor4-gauge">
+                    <div class="gauge-fill" id="motor4-fill"></div>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-400">Battery Level</span>
+                    <span class="font-mono" id="motor4-percent">91%</span>
+                </div>
+                <div class="mt-3 pt-3 border-t border-gray-700 flex justify-between">
+                    <div class="text-xs text-gray-400">
+                        <div>Voltage: <span class="text-white" id="motor4-voltage">24.9V</span></div>
+                        <div>Temp: <span class="text-white" id="motor4-temp">38°C</span></div>
+                    </div>
+                    <button class="motor-control-btn bg-blue-700 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs">
+                        <i class="fas fa-sliders-h mr-1"></i> Adjust
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Motor 5 -->
+            <div class="gauge-container bg-gray-800 bg-opacity-30 rounded-xl p-4 border border-gray-700">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-semibold text-lg text-cyan-300">
+                        <i class="fas fa-fan mr-2"></i> EDF Motor 5
+                    </h3>
+                    <span class="status-indicator bg-green-500"></span>
+                </div>
+                <div class="gauge mb-3" id="motor5-gauge">
+                    <div class="gauge-fill" id="motor5-fill"></div>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-400">Battery Level</span>
+                    <span class="font-mono" id="motor5-percent">88%</span>
+                </div>
+                <div class="mt-3 pt-3 border-t border-gray-700 flex justify-between">
+                    <div class="text-xs text-gray-400">
+                        <div>Voltage: <span class="text-white" id="motor5-voltage">24.8V</span></div>
+                        <div>Temp: <span class="text-white" id="motor5-temp">40°C</span></div>
+                    </div>
+                    <button class="motor-control-btn bg-blue-700 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs">
+                        <i class="fas fa-sliders-h mr-1"></i> Adjust
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Motor 6 -->
+            <div class="gauge-container bg-gray-800 bg-opacity-30 rounded-xl p-4 border border-gray-700">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-semibold text-lg text-cyan-300">
+                        <i class="fas fa-fan mr-2"></i> EDF Motor 6
+                    </h3>
+                    <span class="status-indicator bg-red-500"></span>
+                </div>
+                <div class="gauge mb-3 low-battery" id="motor6-gauge">
+                    <div class="gauge-fill" style="background: linear-gradient(to top, #d32f2f, #f44336);" id="motor6-fill"></div>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-400">Battery Level</span>
+                    <span class="font-mono" id="motor6-percent">15%</span>
+                </div>
+                <div class="mt-3 pt-3 border-t border-gray-700 flex justify-between">
+                    <div class="text-xs text-gray-400">
+                        <div>Voltage: <span class="text-white" id="motor6-voltage">22.4V</span></div>
+                        <div>Temp: <span class="text-white" id="motor6-temp">58°C</span></div>
+                    </div>
+                    <button class="motor-control-btn bg-blue-700 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs">
+                        <i class="fas fa-sliders-h mr-1"></i> Adjust
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Motor 7 -->
+            <div class="gauge-container bg-gray-800 bg-opacity-30 rounded-xl p-4 border border-gray-700">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-semibold text-lg text-cyan-300">
+                        <i class="fas fa-fan mr-2"></i> EDF Motor 7
+                    </h3>
+                    <span class="status-indicator bg-green-500"></span>
+                </div>
+                <div class="gauge mb-3" id="motor7-gauge">
+                    <div class="gauge-fill" id="motor7-fill"></div>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-400">Battery Level</span>
+                    <span class="font-mono" id="motor7-percent">76%</span>
+                </div>
+                <div class="mt-3 pt-3 border-t border-gray-700 flex justify-between">
+                    <div class="text-xs text-gray-400">
+                        <div>Voltage: <span class="text-white" id="motor7-voltage">24.2V</span></div>
+                        <div>Temp: <span class="text-white" id="motor7-temp">46°C</span></div>
+                    </div>
+                    <button class="motor-control-btn bg-blue-700 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs">
+                        <i class="fas fa-sliders-h mr-1"></i> Adjust
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Motor 8 -->
+            <div class="gauge-container bg-gray-800 bg-opacity-30 rounded-xl p-4 border border-gray-700">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-semibold text-lg text-cyan-300">
+                        <i class="fas fa-fan mr-2"></i> EDF Motor 8
+                    </h3>
+                    <span class="status-indicator bg-yellow-500"></span>
+                </div>
+                <div class="gauge mb-3 warning-battery" id="motor8-gauge">
+                    <div class="gauge-fill" style="background: linear-gradient(to top, #ffa000, #ffca28);" id="motor8-fill"></div>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-400">Battery Level</span>
+                    <span class="font-mono" id="motor8-percent">28%</span>
+                </div>
+                <div class="mt-3 pt-3 border-t border-gray-700 flex justify-between">
+                    <div class="text-xs text-gray-400">
+                        <div>Voltage: <span class="text-white" id="motor8-voltage">22.9V</span></div>
+                        <div>Temp: <span class="text-white" id="motor8-temp">53°C</span></div>
+                    </div>
+                    <button class="motor-control-btn bg-blue-700 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs">
+                        <i class="fas fa-sliders-h mr-1"></i> Adjust
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- System Summary -->
+        <div class="mt-8 bg-gray-800 bg-opacity-30 rounded-xl p-6 border border-gray-700">
+            <h2 class="text-xl font-semibold text-cyan-300 mb-4 flex items-center">
+                <i class="fas fa-chart-bar mr-2"></i> System Summary
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="bg-gray-800 bg-opacity-50 p-4 rounded-lg border border-gray-700">
+                    <div class="text-gray-400 text-sm mb-1">Average Battery Level</div>
+                    <div class="text-2xl font-bold text-white">64.1%</div>
+                    <div class="h-2 mt-2 bg-gray-700 rounded-full">
+                        <div class="h-2 bg-cyan-500 rounded-full" style="width: 64.1%"></div>
+                    </div>
+                </div>
+                <div class="bg-gray-800 bg-opacity-50 p-4 rounded-lg border border-gray-700">
+                    <div class="text-gray-400 text-sm mb-1">Lowest Battery</div>
+                    <div class="text-2xl font-bold text-red-400">15%</div>
+                    <div class="text-xs text-gray-400">Motor 6</div>
+                </div>
+                <div class="bg-gray-800 bg-opacity-50 p-4 rounded-lg border border-gray-700">
+                    <div class="text-gray-400 text-sm mb-1">Highest Temperature</div>
+                    <div class="text-2xl font-bold text-orange-400">58°C</div>
+                    <div class="text-xs text-gray-400">Motor 6</div>
+                </div>
+                <div class="bg-gray-800 bg-opacity-50 p-4 rounded-lg border border-gray-700">
+                    <div class="text-gray-400 text-sm mb-1">System Health</div>
+                    <div class="text-2xl font-bold text-yellow-400">Warning</div>
+                    <div class="text-xs text-gray-400">2 motors critical</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Connection Status -->
+        <div class="connection-status bg-green-700 text-white">
+            <i class="fas fa-plug mr-2"></i> Connected to EDF Control System
+        </div>
+    </div>
+
+    <script>
+        // Initialize gauge levels
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set initial battery levels
+            setBatteryLevel('motor1', 85);
+            setBatteryLevel('motor2', 78);
+            setBatteryLevel('motor3', 32);
+            setBatteryLevel('motor4', 91);
+            setBatteryLevel('motor5', 88);
+            setBatteryLevel('motor6', 15);
+            setBatteryLevel('motor7', 76);
+            setBatteryLevel('motor8', 28);
+            
+            // Simulate battery drain over time
+            setInterval(simulateBatteryDrain, 3000);
+        });
+        
+        function setBatteryLevel(motorId, percent) {
+            const fillElement = document.getElementById(`${motorId}-fill`);
+            const percentElement = document.getElementById(`${motorId}-percent`);
+            const gaugeElement = document.getElementById(`${motorId}-gauge`);
+            
+            // Remove all status classes
+            gaugeElement.classList.remove('low-battery', 'warning-battery');
+            
+            // Set the fill height
+            fillElement.style.height = `${percent}%`;
+            percentElement.textContent = `${percent}%`;
+            
+            // Update status indicator color
+            const indicator = document.querySelector(`#${motorId}-gauge`).previousElementSibling.querySelector('.status-indicator');
+            
+            if (percent <= 20) {
+                indicator.classList.remove('bg-green-500', 'bg-yellow-500');
+                indicator.classList.add('bg-red-500');
+                gaugeElement.classList.add('low-battery');
+                fillElement.style.background = 'linear-gradient(to top, #d32f2f, #f44336)';
+            } else if (percent <= 40) {
+                indicator.classList.remove('bg-green-500', 'bg-red-500');
+                indicator.classList.add('bg-yellow-500');
+                gaugeElement.classList.add('warning-battery');
+                fillElement.style.background = 'linear-gradient(to top, #ffa000, #ffca28)';
+            } else {
+                indicator.classList.remove('bg-yellow-500', 'bg-red-500');
+                indicator.classList.add('bg-green-500');
+                fillElement.style.background = 'linear-gradient(to top, #00acc1, #00e5ff)';
+            }
+            
+            // Update voltage based on percentage (simplified)
+            const voltageElement = document.getElementById(`${motorId}-voltage`);
+            const baseVoltage = 22.0;
+            const maxVoltage = 25.2;
+            const voltage = baseVoltage + (maxVoltage - baseVoltage) * (percent / 100);
+            voltageElement.textContent = voltage.toFixed(1) + 'V';
+            
+            // Update temperature (simplified inverse relationship)
+            const tempElement = document.getElementById(`${motorId}-temp`);
+            const baseTemp = 35;
+            const maxTemp = 60;
+            const temp = baseTemp + (maxTemp - baseTemp) * ((100 - percent) / 100);
+            tempElement.textContent = Math.round(temp) + '°C';
+        }
+        
+        function simulateBatteryDrain() {
+            // Randomly decrease battery levels slightly
+            for (let i = 1; i <= 8; i++) {
+                const percentElement = document.getElementById(`motor${i}-percent`);
+                let currentPercent = parseInt(percentElement.textContent);
+                
+                // Don't drain below 5%
+                if (currentPercent > 5) {
+                    // More drain for motors already low
+                    const drainAmount = currentPercent < 30 ? 
+                        Math.random() * 3 : 
+                        Math.random() * 1.5;
+                    
+                    currentPercent = Math.max(5, currentPercent - drainAmount);
+                    setBatteryLevel(`motor${i}`, Math.round(currentPercent));
+                }
+            }
+            
+            // Occasionally have a motor recover (simulating battery swap)
+            if (Math.random() < 0.1) {
+                const randomMotor = Math.floor(Math.random() * 8) + 1;
+                setBatteryLevel(`motor${randomMotor}`, 85 + Math.floor(Math.random() * 15));
+            }
+        }
+    </script>
+</body>
+</html>
